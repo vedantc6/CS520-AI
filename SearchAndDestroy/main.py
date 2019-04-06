@@ -85,6 +85,11 @@ class Agent():
         self.belief = np.full((self.dim, self.dim), 1/(self.dim**2))
         self.target_cell = game.create_target()
         self.confidence = np.full((self.dim, self.dim), 1/(self.dim**2))
+    
+        for i in range(self.dim):
+            for j in range(self.dim):
+                self.confidence[i][j] *= (1 - self.false_neg_rate(i, j)[0])
+        print("Initial Confidence Matrix: \n", self.confidence)
 
     def false_neg_rate(self, x, y):
         if self.original_map[x][y] == 0:
@@ -108,7 +113,6 @@ class Agent():
                 if self.belief[i][j] == self.belief[first_index][second_index]:
                     max_values.append((i,j))
         random_from_max = random.randint(1, len(max_values)) - 1
-        # print(max_values, random_from_max)
         return max_values[random_from_max]
 
     def run_game(self):
@@ -117,28 +121,35 @@ class Agent():
             current_cell = self.max_prob_cell()
             print(current_cell, self.target_cell)
             if current_cell == self.target_cell:
-                print("Number of iterations: ", iterations)
-                break
+                terrain_prob = self.false_neg_rate(current_cell[0], current_cell[1])[0]
+                p = random.uniform(0, 1)
+                print("Terrain FNR: ", terrain_prob, " Probability: ", p)
+                if p > terrain_prob:
+                    print("Number of iterations: ", iterations)
+                    break
             else:
                 # Update iterations
                 iterations += 1
+                
                 # Calculate new belief of current cell
                 self.belief[current_cell[0]][current_cell[1]] *= self.false_neg_rate(current_cell[0], current_cell[1])[0]
                 # print("New Belief Matrix: \n", self.belief)
-                print("Terrain: ", self.false_neg_rate(current_cell[0], current_cell[1])[1])
+                
                 # Sum of the belief matrix
                 belief_sum = np.sum(self.belief)
                 # Normalize the belief matrix
                 self.belief = self.belief/belief_sum
                 # print("Normalized Belief Matrix: \n", self.belief)
 
-                # Update confidence matrix
+                # Calculate new confidence based on new belief
+                for i in range(self.dim):
+                    for j in range(self.dim):
+                        self.confidence[i][j] = self.belief[i][j]*(1 - self.false_neg_rate(i, j)[0])
                 
-
-
-                
-
-                
+                # Sum of the confidence matrix
+                conf_sum = np.sum(self.confidence)
+                # Normalize the confidence matrix
+                self.confidence = self.confidence/conf_sum
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Probabilistic models to search and destroy")
