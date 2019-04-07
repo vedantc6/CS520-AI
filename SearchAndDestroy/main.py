@@ -79,6 +79,15 @@ class SearchAndDestroy():
         else:
             return coordinates[0]
 
+    def get_manhattan_distance(self, x1, y1, x2, y2):
+        return abs(x1-x2) + abs(y1-y2)
+
+    def get_distance(self, x1, y1):
+        distance_matrix = np.zeros([self.dim, self.dim])
+        for x2 in range(self.dim):
+            for y2 in range(self.dim):
+                distance_matrix[x2][y2] = self.get_manhattan_distance(x1, y1, x2, y2)
+        return distance_matrix
 
     def generate_layout(self, belief, confidence, heat_map, iterations):
         # Display original matrix in console
@@ -122,11 +131,13 @@ class Agent():
 
         return fnr
 
-    def max_prob_cell(self, rule):
+    def max_prob_cell(self, rule, matrix=None):
         if rule == "belief":
             mat = self.belief
         elif rule == "confidence":
             mat = self.confidence
+        elif rule == "belief with distance" or rule == "confidence with distance":
+            mat = matrix
 
         max_val = np.argmax(mat)
         first_index = int(max_val/self.dim)
@@ -139,51 +150,109 @@ class Agent():
         random_from_max = random.randint(1, len(max_values)) - 1
         return max_values[random_from_max]
 
-    def run_game(self):
+    def run_game(self, rule_type):
         iterations = 1
-        while True:
-            current_cell = self.max_prob_cell(game.rule)
-            self.heat_map[current_cell[0], current_cell[1]] += 1
-            
-            # print("Current cell: {}, Target cell: {}".format(current_cell, self.target_cell))
-            
-            if self.visual:
-                    plt.ion()
-                    plt.show()
-                    plt.pause(1e-15)
-                    game.generate_layout(self.belief, self.confidence, self.heat_map, iterations)
+        if rule_type == "normal":
+            while True:
+                current_cell = self.max_prob_cell(game.rule)
+                self.heat_map[current_cell[0], current_cell[1]] += 1
+                
+                # print("Current cell: {}, Target cell: {}".format(current_cell, self.target_cell))
+                
+                if self.visual:
+                        plt.ion()
+                        plt.show()
+                        plt.pause(1e-15)
+                        game.generate_layout(self.belief, self.confidence, self.heat_map, iterations)
 
-            if current_cell == self.target_cell:
-                terrain_prob = self.false_neg_rate(current_cell[0], current_cell[1])[0]
-                p = random.uniform(0, 1)
-                # print("Terrain FNR: ", terrain_prob, " Probability: ", p)
-                if p > terrain_prob:
-                    return iterations
-                    # print("Number of iterations: ", iterations)
-                    # break
-            else:
-                # Update iterations
-                iterations += 1
-                
-                # Calculate new belief of current cell
-                self.belief[current_cell[0]][current_cell[1]] *= self.false_neg_rate(current_cell[0], current_cell[1])[0]
-                # print("New Belief Matrix: \n", self.belief)
-                
-                # Sum of the belief matrix
-                belief_sum = np.sum(self.belief)
-                # Normalize the belief matrix
-                self.belief = self.belief/belief_sum
-                # print("Normalized Belief Matrix: \n", self.belief)
+                if current_cell == self.target_cell:
+                    terrain_prob = self.false_neg_rate(current_cell[0], current_cell[1])[0]
+                    p = random.uniform(0, 1)
+                    # print("Terrain FNR: ", terrain_prob, " Probability: ", p)
+                    if p > terrain_prob:
+                        return iterations
+                        # break
+                else:
+                    # Update iterations
+                    iterations += 1
+                    
+                    # Calculate new belief of current cell
+                    self.belief[current_cell[0]][current_cell[1]] *= self.false_neg_rate(current_cell[0], current_cell[1])[0]
+                    # print("New Belief Matrix: \n", self.belief)
+                    
+                    # Sum of the belief matrix
+                    belief_sum = np.sum(self.belief)
+                    # Normalize the belief matrix
+                    self.belief = self.belief/belief_sum
+                    # print("Normalized Belief Matrix: \n", self.belief)
 
-                # Calculate new confidence based on new belief
-                for i in range(self.dim):
-                    for j in range(self.dim):
-                        self.confidence[i][j] = self.belief[i][j]*(1 - self.false_neg_rate(i, j)[0])
+                    # Calculate new confidence based on new belief
+                    for i in range(self.dim):
+                        for j in range(self.dim):
+                            self.confidence[i][j] = self.belief[i][j]*(1 - self.false_neg_rate(i, j)[0])
+                    
+                    # Sum of the confidence matrix
+                    conf_sum = np.sum(self.confidence)
+                    # Normalize the confidence matrix
+                    self.confidence = self.confidence/conf_sum
+        
+        if rule_type == "dist":
+            if "belief" in game.rule:
+                current_cell = self.max_prob_cell("belief")
+            elif "confidence" in game.rule:
+                current_cell = self.max_prob_cell("confidence")
+
+            distance_matrix = np.zeros_like(self.belief)
+
+            while True:
+                self.heat_map[current_cell[0], current_cell[1]] += 1
                 
-                # Sum of the confidence matrix
-                conf_sum = np.sum(self.confidence)
-                # Normalize the confidence matrix
-                self.confidence = self.confidence/conf_sum
+                # print("Current cell: {}, Target cell: {}".format(current_cell, self.target_cell))
+                
+                if self.visual:
+                        plt.ion()
+                        plt.show()
+                        plt.pause(1e-15)
+                        game.generate_layout(self.belief, self.confidence, self.heat_map, iterations)
+
+                if current_cell == self.target_cell:
+                    terrain_prob = self.false_neg_rate(current_cell[0], current_cell[1])[0]
+                    p = random.uniform(0, 1)
+                    # print("Terrain FNR: ", terrain_prob, " Probability: ", p)
+                    if p > terrain_prob:
+                        return iterations
+                        # break
+                else:
+                    # Update iterations
+                    iterations += 1
+                    
+                    # Calculate new belief of current cell
+                    self.belief[current_cell[0]][current_cell[1]] *= self.false_neg_rate(current_cell[0], current_cell[1])[0]
+                    # print("New Belief Matrix: \n", self.belief)
+                    
+                    # Sum of the belief matrix
+                    belief_sum = np.sum(self.belief)
+                    # Normalize the belief matrix
+                    self.belief = self.belief/belief_sum
+                    # print("Normalized Belief Matrix: \n", self.belief)
+
+                    # Calculate new confidence based on new belief
+                    for i in range(self.dim):
+                        for j in range(self.dim):
+                            self.confidence[i][j] = self.belief[i][j]*(1 - self.false_neg_rate(i, j)[0])
+                    
+                    # Sum of the confidence matrix
+                    conf_sum = np.sum(self.confidence)
+                    # Normalize the confidence matrix
+                    self.confidence = self.confidence/conf_sum
+
+                    distance_matrix = game.get_distance(current_cell[0], current_cell[1])
+                    log_matrix = 1 + np.log(1 + distance_matrix)
+                    if game.rule == "belief":
+                        current_cell = self.max_prob_cell(rule=game.rule, matrix=self.belief/log_matrix)
+                    else:
+                        current_cell = self.max_prob_cell(rule=game.rule, matrix=self.confidence/log_matrix)
+        
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Probabilistic models to search and destroy")
@@ -196,11 +265,11 @@ if __name__ == "__main__":
     if args.question == "basic":
         game = SearchAndDestroy(dimensions=int(args.grid_dimension), visual=args.visual, rule=args.rule, target_type=None)
         agent = Agent(game)
-        agent_iters = agent.run_game()
+        agent_iters = agent.run_game(rule_type="normal")
         print("Number of iterations: ", agent_iters)
 
     if args.question == "q13":
-        dict_q3 = {}
+        sol_dict = {}
         save_file = "q3_analysis.csv"
         csv = open(save_file, "w")
         csv.write("Grid Size, Rule Type, Terrain Type, Iterations\n")
@@ -209,20 +278,52 @@ if __name__ == "__main__":
             for rule in ["belief", "confidence"]:
                 for terrain_target in ["flat", "hill", "forest", "cave"]:
                     agent_iters = 0
+                    print("Running for Grid Dimension {}, Rule {}, Terrain Type {}".format(grid_size, rule, terrain_target))
                     for iter in range(10):
-                        print("Running for Grid Dimension {}, Rule {}, Terrain Type {}".format(grid_size, rule, terrain_target))
                         game = SearchAndDestroy(dimensions=grid_size, visual=args.visual, rule=rule, target_type=terrain_target)
                         agent = Agent(game)
-                        agent_iters += agent.run_game()
+                        agent_iters += agent.run_game(rule_type="normal")
 
                     agent_iters /= 10
-                    if str(grid_size) not in dict_q3:
-                        dict_q3[str(grid_size)] = [[rule, terrain_target, int(agent_iters)]]
+                    if str(grid_size) not in sol_dict:
+                        sol_dict[str(grid_size)] = [[rule, terrain_target, int(agent_iters)]]
                     
                     else:
-                        dict_q3[str(grid_size)].append([rule, terrain_target, int(agent_iters)])
+                        sol_dict[str(grid_size)].append([rule, terrain_target, int(agent_iters)])
         
-        for key, val in dict_q3.items():
+        for key, val in sol_dict.items():
+            for v in val:
+                row = key + "," + v[0] + "," + v[1] + "," + str(v[2]) + "\n"
+                csv.write(row)
+
+    if args.question == "q14":      # TO ADD: Distance covered metric
+        sol_dict = {}
+        save_file = "q4_analysis.csv"
+        csv = open(save_file, "w")
+        csv.write("Grid Size, Rule Type, Terrain Type, Iterations\n")
+        
+        for grid_size in range(5, 50):
+            for rule in ["belief", "confidence", "belief with distance", "confidence with distance"]:
+                for terrain_target in ["flat", "hill", "forest", "cave"]:
+                    agent_iters = 0
+                    print("Running for Grid Dimension {}, Rule {}, Terrain Type {}".format(grid_size, rule, terrain_target))
+                    for iter in range(10):
+                        game = SearchAndDestroy(dimensions=grid_size, visual=args.visual, rule=rule, target_type=terrain_target)
+                        agent = Agent(game)
+                        if rule in ["belief", "confidence"]:
+                            agent_iters += agent.run_game(rule_type="normal")
+
+                        elif rule in ["belief with distance", "confidence with distance"]:
+                            agent_iters += agent.run_game(rule_type="dist")    
+
+                    agent_iters /= 10
+                    if str(grid_size) not in sol_dict:
+                        sol_dict[str(grid_size)] = [[rule, terrain_target, int(agent_iters)]]
+                    
+                    else:
+                        sol_dict[str(grid_size)].append([rule, terrain_target, int(agent_iters)])
+        
+        for key, val in sol_dict.items():
             for v in val:
                 row = key + "," + v[0] + "," + v[1] + "," + str(v[2]) + "\n"
                 csv.write(row)
