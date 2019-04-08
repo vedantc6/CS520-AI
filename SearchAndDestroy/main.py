@@ -252,7 +252,77 @@ class Agent():
                         current_cell = self.max_prob_cell(rule=game.rule, matrix=self.belief/log_matrix)
                     else:
                         current_cell = self.max_prob_cell(rule=game.rule, matrix=self.confidence/log_matrix)
-        
+
+    def cross_detected(self, type1, typ2):
+        belief_with_evidence = np.zeros_like(self.belief)
+        pass
+    
+    def target_moves(self, x, y):
+        type1 = self.false_neg_rate(x, y)[1]
+        possible_moves = [(0,1), (0,-1), (1,0), (-1,0), (-1,-1), (-1,1), (1,-1), (1,1)]
+        valid = []
+        for moves in possible_moves:
+            new_cell = (x + moves[0], y + moves[1])
+            if new_cell[0] > -1 and new_cell[0] < self.dim and new_cell[1] > -1 and new_cell[1] < self.dim:
+                type2 = self.false_neg_rate(new_cell[0], new_cell[1])[1] 
+                if type2 != type1:
+                    valid.append(new_cell)
+
+        choose = random.randint(1, len(valid)) - 1
+        new_target = valid[choose]
+        type2 = self.false_neg_rate(new_target[0], new_target[1])[1]
+        return new_target, type1, type2
+
+    def run_game_moving_target(self, rule_type):
+        iterations = 1
+        target = self.target_cell
+        if rule_type == "normal":
+            while True:
+                current_cell = self.max_prob_cell(game.rule)
+                self.heat_map[current_cell[0], current_cell[1]] += 1
+                
+                # print("Current cell: {}, Target cell: {}".format(current_cell, self.target_cell))
+                
+                if self.visual:
+                        plt.ion()
+                        plt.show()
+                        plt.pause(1e-15)
+                        game.generate_layout(self.belief, self.confidence, self.heat_map, iterations)
+
+                if current_cell == target:
+                    terrain_prob = self.false_neg_rate(current_cell[0], current_cell[1])[0]
+                    p = random.uniform(0, 1)
+                    # print("Terrain FNR: ", terrain_prob, " Probability: ", p)
+                    if p > terrain_prob:
+                        return iterations
+                        # break
+                else:
+                    # Update iterations
+                    iterations += 1
+                    
+                    # Calculate new belief of current cell
+                    self.belief[current_cell[0]][current_cell[1]] *= self.false_neg_rate(current_cell[0], current_cell[1])[0]
+                    # print("New Belief Matrix: \n", self.belief)
+                    
+                    # Sum of the belief matrix
+                    belief_sum = np.sum(self.belief)
+                    # Normalize the belief matrix
+                    self.belief = self.belief/belief_sum
+                    # print("Normalized Belief Matrix: \n", self.belief)
+
+                    # Calculate new confidence based on new belief
+                    for i in range(self.dim):
+                        for j in range(self.dim):
+                            self.confidence[i][j] = self.belief[i][j]*(1 - self.false_neg_rate(i, j)[0])
+                    
+                    # Sum of the confidence matrix
+                    conf_sum = np.sum(self.confidence)
+                    # Normalize the confidence matrix
+                    self.confidence = self.confidence/conf_sum
+
+                    target, type1, type2 = self.target_moves(self.target_cell[0], self.target_cell[1])
+                    belief_with_evidence = self.cross_detected(type1, type2)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Probabilistic models to search and destroy")
@@ -328,3 +398,7 @@ if __name__ == "__main__":
                 row = key + "," + v[0] + "," + v[1] + "," + str(v[2]) + "\n"
                 csv.write(row)
         
+    elif args.question == "q2":
+        game = SearchAndDestroy(dimensions=int(args.grid_dimension), visual=args.visual, rule=args.rule, target_type=None)
+        agent = Agent(game)
+        agent.valid_moves(game.target[0], game.target[1])
