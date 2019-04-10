@@ -272,41 +272,59 @@ class Agent():
     def valid_neighbors(self, x, y, terrain_type):
         possible_moves = [(0,1), (0,-1), (1,0), (-1,0), (-1,-1), (-1,1), (1,-1), (1,1)]
         check = False
+        valid = []
         for moves in possible_moves:
             new_cell = (x + moves[0], y + moves[1])
             if new_cell[0] > -1 and new_cell[0] < self.dim and new_cell[1] > -1 and new_cell[1] < self.dim:
                 new_type = self.false_neg_rate(new_cell[0], new_cell[1])[1] 
                 if new_type == terrain_type:
                     check = True
+                    valid.append(new_type)
         
-        return check
+        return check, valid
 
-    def get_neighbors_sum(self, evidence_matrix):
+    def get_neighbors_sum(self, evidence_matrix, type1, type2):
         n_sum = np.zeros_like(self.belief)
-        for i in range(self.dim):
+        for i in range (self.dim):
             for j in range(self.dim):
-                if i > 0 and j > 0 and i < self.dim-1 and j < self.dim-1:
-                    n_sum[i][j] = evidence_matrix[i-1][j] + evidence_matrix[i+1][j] + evidence_matrix[i-1][j-1] + evidence_matrix[i-1][j+1] + evidence_matrix[i][j+1] + evidence_matrix[i][j+1] +  evidence_matrix[i+1][j+1] + evidence_matrix[i+1][j-1]
-                
-                elif i == 0 and j == 0:
-                    n_sum[i][j] = evidence_matrix[i][j+1] + evidence_matrix[i+1][j+1] + evidence_matrix[i+1][j]
-                elif i == self.dim-1 and j == self.dim-1:
-                    n_sum[i][j] = evidence_matrix[i][j-1] + evidence_matrix[i-1][j] + evidence_matrix[i-1][j-1]
-                elif i == 0 and j == self.dim-1:
-                    n_sum[i][j] = evidence_matrix[i][j-1] + evidence_matrix[i+1][j-1] + evidence_matrix[i+1][j]
-                elif i == self.dim-1 and j == 0:
-                    n_sum[i][j] = evidence_matrix[i][j+1] + evidence_matrix[i-1][j+1] + evidence_matrix[i-1][j]
-                
-                elif i == 0:
-                    n_sum[i][j] = evidence_matrix[i][j-1] + evidence_matrix[i][j+1] + evidence_matrix[i+1][j] +evidence_matrix[i+1][j-1] + evidence_matrix[i+1][j+1]
-                elif i == self.dim -1:
-                    n_sum[i][j] = evidence_matrix[i][j-1] + evidence_matrix[i][j+1] + evidence_matrix[i-1][j] +evidence_matrix[i-1][j-1] + evidence_matrix[i-1][j+1]
-                elif j == 0:
-                    n_sum[i][j] = evidence_matrix[i][j+1] + evidence_matrix[i-1][j] + evidence_matrix[i+1][j] +evidence_matrix[i-1][j+1] + evidence_matrix[i+1][j+1]
-                elif j == self.dim -1:
-                    n_sum[i][j] = evidence_matrix[i][j-1] + evidence_matrix[i+1][j] + evidence_matrix[i-1][j] +evidence_matrix[i+1][j-1] + evidence_matrix[i-1][j-1]
-
+                if evidence_matrix[i][j] != 0:
+                    check, count = self.valid_neighbors(i, j, type2)
+                    if self.false_neg_rate(i, j)[1] == type1 and check:
+                        print(type1, i, j, count)
+                        n_sum[i][j] += len(count)
+                    if self.false_neg_rate(i, j)[1] == type2 and check:
+                        print(type2, i, j, count)
+                        n_sum[i][j] += len(count)
+        
         return n_sum
+    # def get_neighbors_sum(self, evidence_matrix):
+    #     n_sum = np.zeros_like(self.belief)
+    #     for i in range(self.dim):
+    #         for j in range(self.dim):
+    #             if evidence_matrix[i][j] != 0:
+    #                 if i > 0 and j > 0 and i < self.dim-1 and j < self.dim-1:
+    #                     n_sum[i][j] = evidence_matrix[i-1][j] + evidence_matrix[i+1][j] + evidence_matrix[i-1][j-1] + evidence_matrix[i-1][j+1] + evidence_matrix[i][j+1] + evidence_matrix[i][j+1] +  evidence_matrix[i+1][j+1] + evidence_matrix[i+1][j-1]
+                    
+    #                 elif i == 0 and j == 0:
+    #                     n_sum[i][j] = evidence_matrix[i][j+1] + evidence_matrix[i+1][j+1] + evidence_matrix[i+1][j]
+    #                 elif i == self.dim-1 and j == self.dim-1:
+    #                     n_sum[i][j] = evidence_matrix[i][j-1] + evidence_matrix[i-1][j] + evidence_matrix[i-1][j-1]
+    #                 elif i == 0 and j == self.dim-1:
+    #                     n_sum[i][j] = evidence_matrix[i][j-1] + evidence_matrix[i+1][j-1] + evidence_matrix[i+1][j]
+    #                 elif i == self.dim-1 and j == 0:
+    #                     n_sum[i][j] = evidence_matrix[i][j+1] + evidence_matrix[i-1][j+1] + evidence_matrix[i-1][j]
+                    
+    #                 elif i == 0:
+    #                     n_sum[i][j] = evidence_matrix[i][j-1] + evidence_matrix[i][j+1] + evidence_matrix[i+1][j] +evidence_matrix[i+1][j-1] + evidence_matrix[i+1][j+1]
+    #                 elif i == self.dim -1:
+    #                     n_sum[i][j] = evidence_matrix[i][j-1] + evidence_matrix[i][j+1] + evidence_matrix[i-1][j] +evidence_matrix[i-1][j-1] + evidence_matrix[i-1][j+1]
+    #                 elif j == 0:
+    #                     n_sum[i][j] = evidence_matrix[i][j+1] + evidence_matrix[i-1][j] + evidence_matrix[i+1][j] +evidence_matrix[i-1][j+1] + evidence_matrix[i+1][j+1]
+    #                 elif j == self.dim -1:
+    #                     n_sum[i][j] = evidence_matrix[i][j-1] + evidence_matrix[i+1][j] + evidence_matrix[i-1][j] +evidence_matrix[i+1][j-1] + evidence_matrix[i-1][j-1]
+    #             else:
+    #                 n_sum[i][j] = 0
+    #     return n_sum
 
     def surveilance_report(self, type1, type2):
         evidence_points = np.zeros_like(self.belief)
@@ -315,23 +333,24 @@ class Agent():
         for i in range(self.dim):
             for j in range(self.dim):
                 current_terrain = self.false_neg_rate(i, j)[1]
-                if current_terrain == type1 and self.valid_neighbors(i, j, type2):
+                if current_terrain == type1 and self.valid_neighbors(i, j, type2)[0]:
                     cells_with_values += 1
                     evidence_points[i][j] = 1
-                elif current_terrain == type2 and self.valid_neighbors(i, j, type1):
+                elif current_terrain == type2 and self.valid_neighbors(i, j, type1)[0]:
                     cells_with_values += 1
                     evidence_points[i][j] = 1
                 else:
                     belief_sum_residual += self.belief[i][j]
                     evidence_points[i][j] = 0
         
-        print("Belief\n", self.belief)
-        evidence_sum = self.get_neighbors_sum(evidence_points)
-        new_belief = self.belief*evidence_points
-        print(belief_sum_residual, cells_with_values)
+        # print("Belief\n", self.belief)
         print("Evidence points\n", evidence_points)
+        evidence_sum = self.get_neighbors_sum(evidence_points, type1, type2)
+        new_belief = self.belief*evidence_points
+        # print(belief_sum_residual, cells_with_values)
+
         print("Sum of neighbors\n", evidence_sum)
-        print("Total sum of neighbors", np.sum(evidence_sum))
+        # print("Total sum of neighbors", np.sum(evidence_sum))
         belief_with_evidence = np.zeros_like(new_belief)
         for i in range(self.dim):
             for j in range(self.dim):
@@ -339,8 +358,8 @@ class Agent():
                     new_belief[i][j] += new_belief[i][j] + evidence_sum[i][j]*(belief_sum_residual/cells_with_values)
                     belief_with_evidence[i][j] = new_belief[i][j]/evidence_sum[i][j]
         
-        print("After evidence, belief\n", new_belief)
-        print("Final belief\n",belief_with_evidence) 
+        # print("After evidence, belief\n", new_belief)
+        # print("Final belief\n",belief_with_evidence) 
         # return belief_with_evidence
     
     def run_game_moving_target(self, rule_type):
@@ -472,5 +491,6 @@ if __name__ == "__main__":
     elif args.question == "q2":
         game = SearchAndDestroy(dimensions=int(args.grid_dimension), visual=args.visual, rule=args.rule, target_type=None)
         agent = Agent(game)
+        print("Original map\n", game.original_map)
         # agent.run_game_moving_target(rule_type="normal")
         agent.surveilance_report("flat", "hill")
