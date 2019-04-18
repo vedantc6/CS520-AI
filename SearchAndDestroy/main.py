@@ -531,7 +531,7 @@ if __name__ == "__main__":
         csv = open(save_file, "w")
         csv.write("Grid Size, Rule Type, Iterations\n")
 
-        for grid_size in range(10,12):
+        for grid_size in range(10,50):
             for rule in ["belief", "confidence", "belief with distance", "confidence with distance"]:
                 agent_iters = 0
                 print("Running for Grid Dimension {}, Rule {}".format(grid_size, rule))
