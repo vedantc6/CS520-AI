@@ -114,6 +114,12 @@ class Agent():
         self.confidence = np.full((self.dim, self.dim), 1/(self.dim**2))
         self.visual = game.visual
         self.heat_map = np.zeros((self.dim, self.dim))
+        self.TerrainMapping = {
+            'flat': 0,
+            'hill': 1,
+            'forest': 2,
+            'caves': 3
+        }
     
         for i in range(self.dim):
             for j in range(self.dim):
@@ -270,85 +276,57 @@ class Agent():
         type2 = self.false_neg_rate(new_target[0], new_target[1])[1]
         return new_target, type1, type2
 
-    def valid_neighbors(self, x, y, terrain_type):
-        possible_moves = [(0,1), (0,-1), (1,0), (-1,0), (-1,-1), (-1,1), (1,-1), (1,1)]
-        check = False
-        valid = []
-        for moves in possible_moves:
-            new_cell = (x + moves[0], y + moves[1])
-            if new_cell[0] > -1 and new_cell[0] < self.dim and new_cell[1] > -1 and new_cell[1] < self.dim:
-                new_type = self.false_neg_rate(new_cell[0], new_cell[1])[1] 
-                if new_type == terrain_type:
-                    check = True
-                    valid.append(new_type)
-        
-        return check, valid
-
-    def get_neighbors_sum(self, evidence_matrix, type1, type2):
-        n_sum = np.zeros_like(self.belief)
-        for i in range(self.dim):
-            for j in range(self.dim):
-                if evidence_matrix[i][j] != 0:
-                    check, count = self.valid_neighbors(i, j, type2)
-                    if self.false_neg_rate(i, j)[1] == type1 and check:
-                        print(type1, i, j, count)
-                        n_sum[i][j] += len(count)
-                    if self.false_neg_rate(i, j)[1] == type2 and check:
-                        print(type2, i, j, count)
-                        n_sum[i][j] += len(count)
-        
-        return n_sum
-
     def update_belief(self, type1, type2):
         new_belief = self.belief.copy()
-        hill_coords = list(zip(*np.where(game.original_map == 1)))
-        forest_coords = list(zip(*np.where(game.original_map == 2)))
+        type1_coords = list(zip(*np.where(self.original_map == self.TerrainMapping[type1])))
+        type2_coords = list(zip(*np.where(self.original_map == self.TerrainMapping[type2])))
 
-        # Change belief of non-hilly and forest terrains to 0
-        other_coords_1 = list(zip(*np.where(game.original_map == 0)))
-        other_coords_2 = list(zip(*np.where(game.original_map == 3)))
+        # Change belief of the other terrains to 0
+        other_types = [type for type in self.TerrainMapping.keys() if type not in [type1, type2]]
+        other_coords_1 = list(zip(*np.where(self.original_map == self.TerrainMapping[other_types[0]])))
+        other_coords_2 = list(zip(*np.where(self.original_map == self.TerrainMapping[other_types[1]])))
         other_coords = other_coords_1 + other_coords_2
         for (r, c) in other_coords:
             new_belief[r, c] = 0
 
-        # Update all hill cells beside forest cell
-        for (row, column) in forest_coords:
+        # Update all type1 cells beside the type2 cells
+        for (row, column) in type2_coords:
 
             # Iterate through the neighbours:
-            hill_counts = 0
-            surrounding_hills = []
+            type1_counts = 0
+            surrounding_type1 = []
             for i in [-1, 0, 1]:
                 for j in [-1, 0, 1]:
                     if i == 0 and j == 0:
                         continue
-                    if (row + i, column + j) in hill_coords:
-                        hill_counts += 1
-                        surrounding_hills.append((row + i, column + j))
+                    if (row + i, column + j) in type1_coords:
+                        type1_counts += 1
+                        surrounding_type1.append((row + i, column + j))
 
-            # Divide the current belief of forest equally among the surrounding hills
-            if hill_counts != 0:
-                belief_delta = self.belief[row, column]/hill_counts
-                for (r, c) in surrounding_hills:
+            # Divide the current belief of type2 cell equally among the surrounding type1 cells
+            if type1_counts != 0:
+                belief_delta = self.belief[row, column]/type1_counts
+                for (r, c) in surrounding_type1:
                     new_belief[r, c] += belief_delta
 
-        # Update all hill cells beside hill cell
-        for (row, column) in hill_coords:
+        # Update all type2 cells beside a type1 cell
+        for (row, column) in type1_coords:
 
             # Iterate through the neighbours:
-            forest_counts = 0
-            surrounding_forests = []
+            type2_counts = 0
+            surrounding_type2 = []
             for i in [-1, 0, 1]:
                 for j in [-1, 0, 1]:
                     if i == 0 and j == 0:
                         continue
-                    if (row + i, column + j) in forest_coords:
-                        forest_counts += 1
-                        surrounding_forests.append((row + i, column + j))
+                    if (row + i, column + j) in type2_coords:
+                        type2_counts += 1
+                        surrounding_type2.append((row + i, column + j))
 
-            # Divide the current belief of forest equally among the surrounding hills
-            if forest_counts != 0:
-                belief_delta = self.belief[row, column] / forest_counts
-                for (r, c) in surrounding_forests:
+            # Divide the current belief of type1 cell equally among the surrounding type2 cells
+            if type2_counts != 0:
+                belief_delta = self.belief[row, column] / type2_counts
+                for (r, c) in surrounding_type2:
                     new_belief[r, c] += belief_delta
 
         # Normalise the new belief matrix
@@ -357,7 +335,7 @@ class Agent():
         self.belief = new_belief
     
     def run_game_moving_target(self, rule_type):
-        game.original_map = np.uint64(game.original_map)
+        self.original_map = np.uint64(game.original_map)
         iterations = 1
         target = self.target_cell
         if rule_type == "normal":
@@ -380,7 +358,6 @@ class Agent():
                 else:
                     # Update iterations
                     iterations += 1
-                    
                     # Calculate new belief of current cell
                     self.belief[current_cell[0]][current_cell[1]] *= self.false_neg_rate(current_cell[0], current_cell[1])[0]
                     
@@ -391,7 +368,7 @@ class Agent():
                     self.belief = self.belief/belief_sum
 
                     # Target moved to new position
-                    target, type1, type2 = self.target_moves(self.target_cell[0], self.target_cell[1])
+                    target, type1, type2 = self.target_moves(target[0], target[1])
                     self.update_belief(type1, type2)
 
                     # Calculate new confidence based on new belief
@@ -404,9 +381,11 @@ class Agent():
 
                     # Normalize the confidence matrix
                     self.confidence = self.confidence/conf_sum
-
-                    current_cell = self.max_prob_cell(rule = game.rule, matrix = self.belief)
-
+                    
+                    if "belief" in game.rule:
+                        current_cell = self.max_prob_cell("belief")
+                    elif "confidence" in game.rule:
+                        current_cell = self.max_prob_cell("confidence")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Probabilistic models to search and destroy")
@@ -483,10 +462,34 @@ if __name__ == "__main__":
                 csv.write(row)
         
     elif args.question == "q2":
-        game = SearchAndDestroy(dimensions = int(args.grid_dimension),
-                                visual = args.visual,
-                                rule = args.rule,
-                                target_type = None)
-        agent = Agent(game)
-        print("Original map\n", game.original_map)
-        agent.run_game_moving_target(rule_type = "normal")
+        sol_dict = {}
+        save_file = "moving_target_analysis.csv"
+        csv = open(save_file, "w")
+        csv.write("Grid Size, Rule Type, Terrain Type, Iterations\n")
+
+        for grid_size in range(5,9):
+            for rule in ["belief"]:
+                for terrain_target in ["flat", "hill", "forest", "cave"]:
+                    agent_iters = 0
+                    print("Running for Grid Dimension {}, Rule {}, Terrain Type {}".format(grid_size, rule, terrain_target))
+                    for iter in range(10):
+                        game = SearchAndDestroy(dimensions=grid_size, visual=args.visual, rule=rule, target_type=terrain_target)
+                        agent = Agent(game)
+                        print(agent.original_map)
+                        if rule in ["belief", "confidence"]:
+                            agent_iters += agent.run_game_moving_target(rule_type="normal")
+
+                        # elif rule in ["belief with distance", "confidence with distance"]:
+                        #     agent_iters += agent.run_game(rule_type="dist")    
+
+                    agent_iters /= 10
+                    if str(grid_size) not in sol_dict:
+                        sol_dict[str(grid_size)] = [[rule, terrain_target, int(agent_iters)]]
+                    
+                    else:
+                        sol_dict[str(grid_size)].append([rule, terrain_target, int(agent_iters)])
+        
+        for key, val in sol_dict.items():
+            for v in val:
+                row = key + "," + v[0] + "," + v[1] + "," + str(v[2]) + "\n"
+                csv.write(row)
