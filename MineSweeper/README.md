@@ -1,0 +1,6 @@
+<p>Second project for CS520: Introduction to Artificial Intelligence, where the goal was to create an AI bot able to solve Minesweeper at different levels of difficulty. 3 different solvers are created:
+<ul>
+<li><b>Basic Solver:</b>The basic solver is the most risk-free solver which will not think on its own but just play the safest moves possible. It will stop the game if there are no further safe moves possible. It is a baseline model which we developed to evaluate the accuracy and effectiveness of the other complex models.</li>
+<li><b>CSP Solver:</b>This is the main bot which plays the game just like humans. CSP refers to Constraint Satisfaction Problem since this is the main algorithm used by the agent. It plays the game just like a normal human - by creating different constraints for each square opened and each mine flagged. When it opens a cell or flags it, the knowledge base is updated and the constraints/equations are resolved.</li>
+<li><b>Bonus CSP Solver:</b>This is just en extension of the the CSP solver. Unlike a typical mineweeper game where the agent will know what lies behind a cell once it is opened, this solver will only get the information with some probability. Hence, if it opens a cell, there is an 80% chance of the agent receiving the correct information.</li>
+</ul>
